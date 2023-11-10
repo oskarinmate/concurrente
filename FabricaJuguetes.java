@@ -3,11 +3,13 @@ import java.util.concurrent.Semaphore;
 public class FabricaJuguetes {
 
     public static void main(String[] args) {
+
+        // creacion de los Semaphore
         Semaphore semaforoCajaLlena = new Semaphore(0);
         Semaphore semaforoCajaVacia = new Semaphore(1);
 
+        // creacion de los objetos para mandarlos a llamar
         MaxSteel FigurasCaja = new MaxSteel(semaforoCajaLlena, semaforoCajaVacia);
-
         GuardadoFig guardadoFig = new GuardadoFig(FigurasCaja);
         Empaquetador empaquetador = new Empaquetador(FigurasCaja, semaforoCajaLlena, semaforoCajaVacia);
 
@@ -18,6 +20,9 @@ public class FabricaJuguetes {
 }
 
 class MaxSteel {
+
+    // se encarga de tener dentro los metodos de empaquetado de los juguetes
+    // y de ocupar los Semaphore para obtener sus permisos y llenar las cajas
 
     private int MuñecasEnCaja;
     private int FigurasEnCaja;
@@ -33,7 +38,7 @@ class MaxSteel {
     }
 
     public void agregarJuguete() throws InterruptedException {
-        semaforoCajaVacia.acquire(); // Adquirir el semáforo de caja vacía
+        semaforoCajaVacia.acquire(); // Adquirir el permiso de caja vacía
         FigurasEnCaja++;
         System.out.println("Figura agregada a la caja (" + FigurasEnCaja + " Figuras en la caja).");
 
@@ -66,6 +71,11 @@ class MaxSteel {
 }
 
 class GuardadoFig extends Thread {
+
+    // clase que nos permite emplear los metodos anteriormentecreados en MaxSteel
+    // class
+    // simula tambien un tiempo de empaquetado
+
     private MaxSteel FigurasCaja;
 
     public GuardadoFig(MaxSteel FigurasCaja) {
@@ -90,6 +100,9 @@ class GuardadoFig extends Thread {
 }
 
 class Empaquetador extends Thread {
+
+    // comprueba si la caja está llena y libera el permiso de una caja nueva
+
     private MaxSteel FigurasCaja;
     private Semaphore semaforoCajaLlena;
     private Semaphore semaforoCajaVacia;
@@ -113,7 +126,7 @@ class Empaquetador extends Thread {
                 Thread.sleep(1000);
 
                 System.out.println("Nueva caja de 20  juguetes depositada.");
-                semaforoCajaVacia.release(); // Señal al embotellador de que hay una caja vacía disponible
+                semaforoCajaVacia.release(); // Señal de que hay una caja vacía disponible
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
