@@ -1,3 +1,4 @@
+import java.util.Scanner;
 import java.util.concurrent.Semaphore;
 
 public class FabricaJuguetes {
@@ -8,8 +9,14 @@ public class FabricaJuguetes {
         Semaphore semaforoCajaLlena = new Semaphore(0);
         Semaphore semaforoCajaVacia = new Semaphore(1);
 
+        // lugar en donde le pedimos el numero de cajas que vamos a producir
+        int requerido = 0;
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Ingresa el número de cajas de juguetes que necesitas:");
+        requerido = scanner.nextInt();
+
         // creacion de los objetos para mandarlos a llamar
-        MaxSteel FigurasCaja = new MaxSteel(semaforoCajaLlena, semaforoCajaVacia);
+        MaxSteel FigurasCaja = new MaxSteel(semaforoCajaLlena, semaforoCajaVacia, requerido);
         GuardadoFig guardadoFig = new GuardadoFig(FigurasCaja);
         Empaquetador empaquetador = new Empaquetador(FigurasCaja, semaforoCajaLlena, semaforoCajaVacia);
 
@@ -28,41 +35,61 @@ class MaxSteel {
     private int FigurasEnCaja;
     private Semaphore semaforoCajaLlena;
     private Semaphore semaforoCajaVacia;
+    private int requerido;
 
-    public MaxSteel(Semaphore semaforoCajaLlena, Semaphore semaforoCajaVacia) {
+    public MaxSteel(Semaphore semaforoCajaLlena, Semaphore semaforoCajaVacia, int requerido) {
 
         this.MuñecasEnCaja = 0;
         this.FigurasEnCaja = 0;
         this.semaforoCajaLlena = semaforoCajaLlena;
         this.semaforoCajaVacia = semaforoCajaVacia;
+        this.requerido = requerido;
     }
 
-    public void agregarJuguete() throws InterruptedException {
+    // metodo para obtener el valor de la variable requerido
+    public int getRequerido() {
+        return requerido;
+    }
+
+    // metodo para actualizar el valor de la variable despues de la produccion de
+    // una caja
+    public synchronized void cajaProducida() {
+        requerido--;
+    }
+
+    // creacion de metodos para agregar figuras, usamos synchronized para evitar
+    // problemas de concurrencia, especificamente la inconsistencia de los datos,
+    // como la variable requerido, fue un dolor de cabeza eso jajaja
+    public synchronized void agregarJuguete() throws InterruptedException {
         semaforoCajaVacia.acquire(); // Adquirir el permiso de caja vacía
         FigurasEnCaja++;
         System.out.println("Figura agregada a la caja (" + FigurasEnCaja + " Figuras en la caja).");
 
-        if ((FigurasEnCaja == 10)) {
+        if ((FigurasEnCaja == 10 && MuñecasEnCaja == 10)) {
             System.out.println("figuras completas en la caja, señalando al Empaquetador.");
             semaforoCajaLlena.release(); // Señal al Empaquetador
             FigurasEnCaja = 0;
+            MuñecasEnCaja = 0;
+            cajaProducida();
 
         }
 
         semaforoCajaVacia.release(); // Liberar el semáforo de caja vacía
     }
 
-    public void agregarMuñeca() throws InterruptedException {
+    public synchronized void agregarMuñeca() throws InterruptedException {
         semaforoCajaVacia.acquire(); // Adquirir el semáforo de caja vacía
 
         MuñecasEnCaja++;
         System.out.println("Muñeca agregada a la caja (" + MuñecasEnCaja + " Muñecas en la caja).");
 
-        if ((MuñecasEnCaja == 10)) {
+        if ((FigurasEnCaja == 10 && MuñecasEnCaja == 10)) {
             System.out.println("todas las muñecas estan en la caja, señalando al Empaquetador.");
             semaforoCajaLlena.release(); // Señal al Empaquetador
 
+            FigurasEnCaja = 0;
             MuñecasEnCaja = 0;
+            cajaProducida();
         }
 
         semaforoCajaVacia.release(); // Liberar el semáforo de caja vacía
@@ -91,6 +118,11 @@ class GuardadoFig extends Thread {
                 FigurasCaja.agregarJuguete();
                 FigurasCaja.agregarMuñeca();
                 Thread.sleep(2000); // Simulacion el tiempo de guardado del juguete
+
+                // revisa si el numero requerido ya llego a 0 para parar la produccion
+                if (FigurasCaja.getRequerido() <= 0) {
+                    break;
+                }
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -127,6 +159,15 @@ class Empaquetador extends Thread {
 
                 System.out.println("Nueva caja de 20  juguetes depositada.");
                 semaforoCajaVacia.release(); // Señal de que hay una caja vacía disponible
+
+                // revisa si el numero requerido ya llego a 0 para parar la produccion, ambas
+                // clases lo tienen porque son hilos, necesitamos parar ambos hilos
+
+                if (FigurasCaja.getRequerido() <= 0) {
+                    System.out.println("las cajas solicitadas están listas...");
+                    break;
+                }
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
