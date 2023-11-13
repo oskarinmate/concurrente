@@ -1,4 +1,5 @@
 import java.util.Scanner;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 
 public class FabricaJuguetes {
@@ -15,14 +16,32 @@ public class FabricaJuguetes {
         System.out.println("Ingresa el número de cajas de juguetes que necesitas:");
         requerido = scanner.nextInt();
 
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+
         // creacion de los objetos para mandarlos a llamar
         MaxSteel FigurasCaja = new MaxSteel(semaforoCajaLlena, semaforoCajaVacia, requerido);
         GuardadoFig guardadoFig = new GuardadoFig(FigurasCaja);
         Empaquetador empaquetador = new Empaquetador(FigurasCaja, semaforoCajaLlena, semaforoCajaVacia);
+        Distribuidor distribuidor = new Distribuidor(FigurasCaja, countDownLatch);
 
         guardadoFig.start();
-        empaquetador.start();
 
+        try {
+            // esperar que ambos threads terminen su ejecucion
+            guardadoFig.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        empaquetador.start();
+        distribuidor.start();
+
+        try {
+            // esperar que ambos threads terminen su ejecucion
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
 
@@ -170,6 +189,42 @@ class Empaquetador extends Thread {
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            }
+        }
+    }
+}
+
+class Distribuidor extends Thread {
+    private MaxSteel FigurasCaja;
+    private CountDownLatch countDownLatch;
+
+    public Distribuidor(MaxSteel FigurasCaja, CountDownLatch countDownLatch) {
+        this.FigurasCaja = FigurasCaja;
+        this.countDownLatch = countDownLatch;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                FigurasCaja.cajaProducida(); // Informa que se ha producido una caja
+
+                // Simular el tiempo de distribución de la caja a la tienda
+                Thread.sleep(3000);
+
+                System.out.println("Caja de juguetes entregada a la tienda.");
+
+                // revisa si todas las cajas requeridas ya se han entregado
+                if (FigurasCaja.getRequerido() <= 0) {
+                    System.out.println("Todas las cajas han sido entregadas a la tienda.");
+                    break;
+                }
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            finally {
+                countDownLatch.countDown(); // informa que el thread a terminado
             }
         }
     }
